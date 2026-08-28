@@ -27,6 +27,11 @@ def create_provider(name: Optional[str] = None) -> LLMProvider:
 
         return MockLLMProvider()
 
+    if provider_name == "openrouter":
+        from app.llm.providers.openrouter import OpenRouterProvider
+
+        return OpenRouterProvider()
+
     if provider_name == "openai":
         from app.llm.providers.openai import OpenAICompatProvider
 

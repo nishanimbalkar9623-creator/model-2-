@@ -45,7 +45,10 @@ safety boundary between the model and the authoritative Backend.
 ### `app/llm`
 - `base.py` — `LLMProvider` / `LLMMessage` / `ToolSpec` abstraction
 - `factory.py` — selects provider from `LLM_PROVIDER`
-- `providers/` — `mock`, `openai`, `gemini`, `anthropic`, `ollama`
+- `errors.py` — structured, provider-independent LLM exceptions (auth/rate/timeout/invalid/unavailable)
+- `key_pool.py` — concurrency-safe OpenRouter multi-key pool with rotation + cooldown
+- `context.py` — truncation helpers so large data never reaches the model wholesale
+- `providers/` — `mock`, `openai`, `gemini`, `anthropic`, `ollama`, `openrouter`
 
 ### `app/tools`
 - `registry.py` — formal registry of 23 `ToolDefinition`s
@@ -163,3 +166,90 @@ heuristics so the engine never depends on network availability.
 | RAG | Empty results, clear indication |
 
 Managed by `GracefulDegradation` singleton with status endpoint.
+
+---
+
+## OpenRouter provider
+
+The engine talks to OpenRouter through the same `LLMProvider` interface the
+agent already uses. Nothing in `orchestrator.py`, tools, or routes is aware
+OpenRouter is in use.
+
+```
+Agent
+  |  LLMProvider (provider-independent)
+  v
+OpenRouterProvider
+  |  httpx.AsyncClient (reusable, pooled)
+  |  OpenRouter /chat/completions (OpenAI-compatible)
+  v
+Selected model (via model routing)
+```
+
+### Key rotation & failure handling
+
+`OpenRouterProvider` owns an `OpenRouterKeyPool` (see `app/llm/key_pool.py`):
+
+- Keys are loaded from `OPENROUTER_API_KEY_1..N` (plus optional single
+  `OPENROUTER_API_KEY` fallback), validated, and handed out round-robin under
+  an `asyncio.Lock` so concurrent requests never all grab the same key.
+- On a retryable failure the failed key is temporarily disabled; another
+  healthy key is selected next.
+- Cooldown is `OPENROUTER_KEY_COOLDOWN_SECONDS` (default 60s). `401`/`403`
+  (invalid key) trigger a much longer hold (≥1h, until reload).
+- Retries are bounded by `MAX_LLM_RETRIES` **and** the number of keys —
+  whichever is smaller — with exponential backoff, honouring `Retry-After`
+  for `429`.
+- `400`-class errors are **not** blindly retried (likely a model/schema
+  problem) — they raise `LLMInvalidRequestError`.
+
+### Failure classification
+
+| Case | Behaviour |
+|------|-----------|
+| `401` / `403` | Disable key (long cooldown), try next |
+| `429` | Disable key briefly, respect `Retry-After`, try next |
+| `5xx` | Temporary provider failure, retry on another key |
+| timeout | Retry on another key |
+| `400` | Raise `LLMInvalidRequestError` (no blind retry) |
+| all keys down | Raise `LLMUnavailableError` (retryable) |
+
+Structured errors (`app/llm/errors.py`) are provider-independent; raw
+OpenRouter payloads are never shown to users.
+
+### Model routing
+
+`OPENROUTER_MODEL` is the default. Optional slots `OPENROUTER_FAST_MODEL` and
+`OPENROUTER_REASONING_MODEL` let the agent request a capability
+(`fast` / `reasoning` / default). The frontend never selects arbitrary models;
+unconfigured slots fall back to the default model.
+
+### Environment variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `LLM_PROVIDER` | `mock` | set to `openrouter` to use OpenRouter |
+| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | base URL |
+| `OPENROUTER_MODEL` | — | default model |
+| `OPENROUTER_FAST_MODEL` | — | fast slot (optional) |
+| `OPENROUTER_REASONING_MODEL` | — | reasoning slot (optional) |
+| `OPENROUTER_HTTP_REFERER` | — | attribution header (optional) |
+| `OPENROUTER_APP_NAME` | `AOS` | `X-Title` attribution header |
+| `OPENROUTER_API_KEY_1..5` | — | key pool (only as many as you set) |
+| `MAX_LLM_RETRIES` | `3` | max attempts per request |
+| `OPENROUTER_KEY_COOLDOWN_SECONDS` | `60` | temporary key cooldown |
+
+### Security
+
+API keys are **never** logged, returned, stored, or committed. Logs reference
+keys only by masked form (`****<suffix>`) and integer index. `/health` and
+`/ready` return only safe aggregates (configured/healthy key counts, model);
+raw `Authorization`/keys never appear. The frontend receives no keys — the
+browser talks only to the AI Engine.
+
+### Context control
+
+Large tool results and document extracts are truncated in `app/llm/context.py`
+before reaching the model, so big client datasets are not forwarded wholesale.
+The backend/ML layer performs heavy data processing; the LLM receives bounded,
+structured summaries and relevant exceptions.

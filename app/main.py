@@ -40,6 +40,9 @@ def build_app() -> FastAPI:
         app.state.orchestrator = orch
         yield
         await backend.aclose()
+        closer = getattr(llm, "aclose", None)
+        if closer:
+            await closer()
 
     app = FastAPI(
         title="AOS AI Engine",

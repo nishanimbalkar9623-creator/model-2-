@@ -6,7 +6,9 @@ the complete AI Engine functionality.
 ## Prerequisites
 
 1. **Backend Repo** running with test client data
-2. **AI Engine** running with `LLM_PROVIDER=mock` (or real provider)
+2. **AI Engine** running with `LLM_PROVIDER=mock` (offline) **or**
+   `LLM_PROVIDER=openrouter` with a key pool for real AI responses
+   (see `.env.example` / README "OpenRouter setup")
 3. **Frontend** (optional) for UI testing
 
 ---

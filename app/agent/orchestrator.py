@@ -24,6 +24,7 @@ from app.agent.workflows import WorkflowName, get_workflow
 from app.agent.recommendations import WorkIntelligence, generate_priorities_response
 from app.backend.client import BackendClient
 from app.llm.base import LLMMessage, LLMProvider, ToolSpec
+from app.llm.context import truncate_tool_result
 from app.memory.context import ContextManager
 from app.memory.conversation import ConversationMemory, get_conversation_memory
 from app.rag.knowledge import get_knowledge_base
@@ -395,7 +396,7 @@ class AgentOrchestrator:
                     })}
 
                     messages.append(
-                        LLMMessage("tool", f"Tool {tool_name} returned: {exec_result.data or exec_result.error}")
+                        LLMMessage("tool", f"Tool {tool_name} returned: {truncate_tool_result(exec_result.data or exec_result.error)}")
                     )
 
                     if exec_result.status.value in ("needs_confirmation", "blocked", "error"):
@@ -574,7 +575,7 @@ class AgentOrchestrator:
 
                     # Add tool result to conversation for next iteration
                     messages.append(
-                        LLMMessage("tool", f"Tool {tool_name} returned: {exec_result.data or exec_result.error}")
+                        LLMMessage("tool", f"Tool {tool_name} returned: {truncate_tool_result(exec_result.data or exec_result.error)}")
                     )
 
                     if exec_result.status.value in ("needs_confirmation", "blocked", "error"):

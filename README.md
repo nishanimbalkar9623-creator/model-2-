@@ -127,7 +127,7 @@ uvicorn app.main:app --reload
 
 See `.env.example` for the full list. Key variables:
 
-- `LLM_PROVIDER` — `mock | openai | gemini | anthropic | ollama`
+- `LLM_PROVIDER` — `mock | openai | gemini | anthropic | ollama | openrouter`
 - `LLM_MODEL`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`,
   `OLLAMA_BASE_URL`
 - `BACKEND_BASE_URL`, `BACKEND_API_KEY` / `BACKEND_JWT_TOKEN`
@@ -137,14 +137,92 @@ See `.env.example` for the full list. Key variables:
 
 ---
 
+## Provider configuration
+
+### Local mock mode (offline, no keys)
+
+```bash
+export LLM_PROVIDER=mock
+uvicorn app.main:app --reload
+```
+
+Use this for development and all offline tests. No internet or API key needed.
+
+### OpenRouter setup (production LLM)
+
+OpenRouter is an OpenAI-compatible aggregator. Set `LLM_PROVIDER=openrouter`
+and configure a key pool:
+
+```bash
+export LLM_PROVIDER=openrouter
+export OPENROUTER_MODEL="openai/gpt-4o-mini"
+export OPENROUTER_API_KEY_1="sk-or-..."
+export OPENROUTER_API_KEY_2="sk-or-..."
+uvicorn app.main:app
+```
+
+**Multiple keys (key pool):** provide up to five keys via separate variables
+`OPENROUTER_API_KEY_1` … `OPENROUTER_API_KEY_5`. Only as many as you set are
+used. The engine:
+
+- rotates keys round-robin,
+- temporarily disables a key on `429`/`5xx`/timeout (cooldown via
+  `OPENROUTER_KEY_COOLDOWN_SECONDS`, default 60s),
+- holds out keys that return `401`/`403` (likely invalid),
+- never retries on `400` (bad request/model/schema),
+- never exceeds `MAX_LLM_RETRIES` or the number of configured keys.
+
+**Model routing** (optional): `OPENROUTER_FAST_MODEL` and
+`OPENROUTER_REASONING_MODEL` slots. The agent requests a *capability*
+(`fast`/`reasoning`/default); the frontend never picks arbitrary models.
+Unconfigured slots fall back to `OPENROUTER_MODEL`.
+
+**Context control:** large tool results and document extracts are truncated
+before they reach the model (`app/llm/context.py`), so huge client datasets are
+never sent wholesale to the LLM. The backend/ML layer does the heavy lifting.
+
+### Startup validation
+
+If `LLM_PROVIDER=openrouter` and **no** OpenRouter key is configured, the
+service fails fast at startup with a clear error. Mock mode needs no key and
+never crashes.
+
+---
+
+## Security warning
+
+> **Never commit `.env`.** It is already in `.gitignore`, but do not paste real
+> keys into README, docs, configs, or code.
+
+OpenRouter API keys:
+
+- are masked in all logs (`sk-or-1-foo123` → `****123`),
+- never appear in responses, exceptions, `/health`, or `/ready`,
+- are never sent to the frontend — the browser talks to this AI Engine, which
+  talks to OpenRouter.
+
+---
+
 ## Testing
 
 ```bash
 LLM_PROVIDER=mock pytest -q
 ```
 
-All 51 tests run fully offline (Mock LLM + a stubbed BackendClient). No
-external LLM or backend is required.
+All tests run fully offline (Mock LLM + a stubbed BackendClient). No external
+LLM or backend is required.
+
+**OpenRouter unit tests** (`tests/test_openrouter.py`) run offline too — they
+mock the HTTP transport, so no keys or network are needed.
+
+**Optional live integration test** (never part of the default suite): set
+`RUN_OPENROUTER_INTEGRATION_TESTS=true` and a real `OPENROUTER_API_KEY_N`, then:
+
+```bash
+RUN_OPENROUTER_INTEGRATION_TESTS=true LLM_PROVIDER=openrouter pytest -q tests/test_openrouter.py
+```
+
+Otherwise the integration test is skipped.
 
 ---
 
@@ -155,7 +233,7 @@ app/
   agent/        orchestration, intent, execution, confirmation, workflows, recommendations
   api/          FastAPI routes (chat, voice, health)
   backend/      BackendClient, auth, schemas, endpoint map
-  llm/          provider abstraction + mock/openai/gemini/anthropic/ollama
+  llm/          provider abstraction + mock/openai/gemini/anthropic/ollama/openrouter, key pool, errors
   memory/       conversation + working context
   rag/          embeddings, retriever, knowledge, document search
   safety/       permissions, validation, PII, action policy

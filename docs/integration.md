@@ -294,11 +294,27 @@ independently enforces the final authorization (403).
 See `.env.example`. Minimum for a working deployment:
 
 ```
-LLM_PROVIDER=mock          # or openai | gemini | anthropic | ollama
+LLM_PROVIDER=mock          # or openai | gemini | anthropic | ollama | openrouter
 BACKEND_BASE_URL=http://backend:8000
 BACKEND_API_KEY=...
 ENGINE_API_KEY=...         # used to authenticate frontend -> engine
 ```
+
+For a production LLM via **OpenRouter**:
+
+```
+LLM_PROVIDER=openrouter
+OPENROUTER_MODEL=openai/gpt-4o-mini
+OPENROUTER_API_KEY_1=sk-or-...   # one or more keys
+OPENROUTER_API_KEY_2=sk-or-...
+MAX_LLM_RETRIES=3
+OPENROUTER_KEY_COOLDOWN_SECONDS=60
+```
+
+See `.env.example` for the full OpenRouter block (key pool, model routing,
+timeouts, optional attribution headers). The agent's voice/text/streaming
+pipelines are **identical** regardless of provider — OpenRouter is completely
+transparent to the frontend.
 
 ### Backend endpoint overrides
 ```

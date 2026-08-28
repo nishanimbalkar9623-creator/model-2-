@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     log_level: str = "DEBUG"
 
     # ---- LLM provider selection ----
-    llm_provider: Literal["mock", "openai", "gemini", "anthropic", "ollama"] = "mock"
+    llm_provider: Literal["mock", "openai", "gemini", "anthropic", "ollama", "openrouter"] = "mock"
     llm_model: Optional[str] = None
 
     openai_api_key: Optional[str] = None
@@ -36,6 +36,19 @@ class Settings(BaseSettings):
     anthropic_api_key: Optional[str] = None
     anthropic_base_url: Optional[str] = None
     ollama_base_url: str = "http://localhost:11434"
+
+    # ---- OpenRouter ----
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    openrouter_model: str = "openai/gpt-4o-mini"
+    openrouter_fast_model: Optional[str] = None
+    openrouter_reasoning_model: Optional[str] = None
+    openrouter_http_referer: Optional[str] = None
+    openrouter_app_name: str = "AOS"
+    openrouter_key_cooldown_seconds: float = 60.0
+    openrouter_connect_timeout_seconds: float = 10.0
+    openrouter_read_timeout_seconds: float = 120.0
+    openrouter_request_id_header: str = "X-Request-Id"
+    max_llm_retries: int = 3
 
     # ---- Backend integration ----
     backend_base_url: str = "http://localhost:8000"
