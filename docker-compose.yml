@@ -1,0 +1,20 @@
+version: "3.9"
+
+services:
+  ai-engine:
+    build: .
+    container_name: aos-ai-engine
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # sensible defaults for local development (override in .env)
+      LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+      BACKEND_BASE_URL: ${BACKEND_BASE_URL:-http://backend:8000}
+    ports:
+      - "8100:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
