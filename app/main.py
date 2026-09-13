@@ -5,6 +5,14 @@ Single service. All business logic lives in app/*.
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# Ensure project root is in sys.path when running directly (e.g., `python app/main.py`)
+_ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(_ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(_ROOT_DIR))
+
 from contextlib import asynccontextmanager
 from typing import Any, Dict
 
@@ -74,3 +82,9 @@ def build_app() -> FastAPI:
 
 
 app = build_app()
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=settings.debug)

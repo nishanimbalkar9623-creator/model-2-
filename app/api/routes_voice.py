@@ -9,8 +9,9 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
+from app.api.routes_chat import _get_orchestrator
 from app.speech.stt import create_stt_provider
 
 router = APIRouter(prefix="/api/v1")
@@ -46,6 +47,7 @@ async def transcribe_audio(
 
 @router.post("/voice/chat")
 async def voice_chat(
+    request: Request,
     file: UploadFile = File(...),
     language: str = Form(default=""),
     client_id: str = Form(default=""),
@@ -71,24 +73,19 @@ async def voice_chat(
         mime_type=file.content_type,
     )
 
-    if not result.text or result.text.startswith("[mock-transcription"):
+    if not result.text:
         raise HTTPException(status_code=400, detail="Could not transcribe audio.")
 
+    # If in mock mode, use a standard query for agent execution
+    agent_message = result.text
+    if agent_message.startswith("[mock-transcription"):
+        agent_message = "What is the status of reconciliation?"
+
     # Run through agent
-    from app.main import app
-    from app.api.routes_chat import _get_orchestrator
-    from starlette.requests import Request
-    
-    # Create a mock request to access app state
-    class MockRequest:
-        def __init__(self, app):
-            self.app = app
-    
-    mock_request = MockRequest(app)
-    orch = _get_orchestrator(mock_request)
+    orch = _get_orchestrator(request)
     
     response = await orch.run(
-        message=result.text,
+        message=agent_message,
         client_id=client_id or None,
         conversation_id=conversation_id or None,
         user_id=user_id or None,

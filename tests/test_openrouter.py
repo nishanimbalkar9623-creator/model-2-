@@ -1,11 +1,16 @@
-"""OpenRouter provider + key pool tests (offline, no real API calls)."""
-
 from __future__ import annotations
 
 import asyncio
 import logging
 import os
+import sys
+from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+# Ensure project root is on sys.path for direct execution
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 
 import httpx
 import pytest
@@ -510,3 +515,9 @@ async def test_openrouter_real_integration():
     result = await provider.generate([LLMMessage("user", "Reply with just: OK")])
     assert result.content
     await provider.aclose()
+
+
+if __name__ == "__main__":
+    import pytest
+
+    sys.exit(pytest.main([__file__]))

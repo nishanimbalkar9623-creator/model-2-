@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# Ensure project root is on sys.path for direct execution
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
 from app.memory.conversation import ConversationMemory
 
 
@@ -41,3 +49,9 @@ def test_pending_action():
     assert m.get_pending_action("c1")["tool"] == "a"
     m.clear_pending_action("c1")
     assert m.get_pending_action("c1") is None
+
+
+if __name__ == "__main__":
+    import pytest
+
+    sys.exit(pytest.main([__file__]))

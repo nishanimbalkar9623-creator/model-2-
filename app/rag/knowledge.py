@@ -7,7 +7,7 @@ into a knowledge-only retriever whose metadata is always
 
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from app.rag.embeddings import EmbeddingProvider, create_embedding_provider
 from app.rag.retriever import RetrievedItem, Retriever
