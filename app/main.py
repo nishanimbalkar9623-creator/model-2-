@@ -92,4 +92,10 @@ if __name__ == "__main__":
 @app.get("/health")
 def health():
     return {"status": "healthy"}
+    app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'online',
+    provider: 'Groq',
+    models: GROQ_MODELS
+  })
 
