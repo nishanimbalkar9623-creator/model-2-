@@ -89,13 +89,11 @@ if __name__ == "__main__":
 
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=settings.debug)
 
-@app.get("/health")
-def health():
-    return {"status": "healthy"}
-    app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'online',
-    provider: 'Groq',
-    models: GROQ_MODELS
-  })
+@app.get("/api/health")
+def api_health():
+    return {
+        "status": "online",
+        "provider": "Groq",
+        "models": GROQ_MODELS
+    }
 
